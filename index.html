@@ -90,8 +90,8 @@
     }
 
     .result-card.not-found {
-      border-color: #e54;
-      background: rgba(238, 85, 68, 0.08);
+      border-color: #3a7bd5;
+      background: rgba(58, 123, 213, 0.08);
     }
 
     .result-indicator {
@@ -99,7 +99,12 @@
     }
 
     .result-indicator.found { color: #4eca7a; }
-    .result-indicator.not-found { color: #e54; }
+    .result-indicator.not-found { color: #5b9bf5; }
+
+    .result-encouragement {
+      font-size: 0.85rem; color: #8bb8ff; margin-top: 8px;
+      font-style: italic;
+    }
 
     .result-handle {
       font-family: monospace; font-size: 0.85rem; color: #888;
@@ -338,6 +343,34 @@
       return lastSegment.toLowerCase();
     }
 
+    // ─── Encouragement Messages ────────────────────────────────────────
+    const ALL_CLEAR_MESSAGES = [
+      "Stock is looking healthy — promote away!",
+      "Plenty of copies to go around. Blast it everywhere!",
+      "Green light — shout it from the rooftops!",
+      "Full steam ahead — this one's well-stocked!",
+      "No inventory worries here. Push it hard!",
+      "The shelves are full — time to sell some records!",
+      "Stock levels looking cozy. Go wild with the promo!",
+      "All clear! Post it, share it, shout about it!",
+      "Inventory is chillin'. Promote to your heart's content!",
+      "No shortage here — let the marketing machine roll!",
+      "This one's stacked up nicely. Feature it everywhere!",
+      "Warehouse says: we've got plenty. Go for it!",
+      "Supply is strong — unleash the campaigns!",
+      "Nothing to worry about — promote like there's no tomorrow!",
+      "Inventory vibes: immaculate. Send those emails!",
+      "Stock check: thriving. Time to make some noise!",
+      "This title is sitting pretty — spread the word!",
+      "We're loaded up on this one. Market it like crazy!",
+      "Smooth sailing on inventory. Promote with confidence!",
+      "No red flags here — this one's ready for the spotlight!",
+    ];
+
+    function getRandomEncouragement() {
+      return ALL_CLEAR_MESSAGES[Math.floor(Math.random() * ALL_CLEAR_MESSAGES.length)];
+    }
+
     // ─── Product Check ─────────────────────────────────────────────────
     function checkProduct() {
       const input = document.getElementById('url-input').value.trim();
@@ -376,8 +409,9 @@
       } else {
         resultDiv.innerHTML = `
           <div class="result-card not-found">
-            <div class="result-indicator not-found">No — not in low inventory</div>
+            <div class="result-indicator not-found">Not in low inventory</div>
             <div class="result-handle">${escapeHtml(handle)}</div>
+            <div class="result-encouragement">${escapeHtml(getRandomEncouragement())}</div>
           </div>
         `;
       }
