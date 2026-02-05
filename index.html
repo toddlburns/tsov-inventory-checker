@@ -59,10 +59,10 @@
       font-family: monospace;
       border: 1px solid #333; border-radius: 8px; background: #1a1a1a;
       color: #fff; outline: none; transition: border-color 0.2s;
-      resize: vertical; min-height: 44px; height: 44px;
+      resize: vertical; min-height: 120px; height: 120px;
       line-height: 1.5;
     }
-    #url-input:focus { border-color: #555; height: auto; min-height: 120px; }
+    #url-input:focus { border-color: #555; }
     #url-input::placeholder { color: #555; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
     #check-btn {
@@ -208,7 +208,7 @@
     <h1>Low Inventory Checker</h1>
     <p class="subtitle">Paste up to 20 product URLs (one per line) to check against the low-inventory collection.</p>
     <div id="collection-status"></div>
-    <textarea id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album" rows="1" autofocus></textarea>
+    <textarea id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album&#10;https://thesoundofvinyl.us/products/another-album&#10;&#10;Paste product URLs here, one per line" rows="5" autofocus></textarea>
     <button id="check-btn" onclick="checkProducts()">Check</button>
     <div id="status"></div>
     <div id="results"></div>
@@ -310,6 +310,33 @@
       el.innerHTML = `<div class="cs-row"><div class="cs-msg">${spinner}${msg}</div>${retryBtn}</div>${progressBar}`;
     }
 
+    async function fetchWithTimeout(url, timeoutMs = 12000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        return res;
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
+      }
+    }
+
+    async function fetchCollectionPage(page, limit) {
+      const directUrl = `${SHOP}/collections/${COLLECTION_HANDLE}/products.json?limit=${limit}&page=${page}`;
+      // Try direct fetch first
+      try {
+        const res = await fetchWithTimeout(directUrl);
+        if (res.ok) return await res.json();
+      } catch (e) { /* fall through to proxy */ }
+      // Fallback: CORS proxy
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+      const res = await fetchWithTimeout(proxyUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+
     async function loadCollection(forceRefresh = false) {
       if (collectionProducts && !forceRefresh) {
         updateCollectionInfo();
@@ -335,10 +362,7 @@
               : `Scanning page ${page}&hellip; ${products.size} products found`,
             Math.min(90, 10 + page * 20));
 
-          const url = `${SHOP}/collections/${COLLECTION_HANDLE}/products.json?limit=${limit}&page=${page}`;
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data = await res.json();
+          const data = await fetchCollectionPage(page, limit);
 
           if (!data.products || data.products.length === 0) break;
 
@@ -361,10 +385,13 @@
         setCollectionStatus('success', `${products.size} products loaded from <code>${COLLECTION_HANDLE}</code> collection`);
         setTimeout(() => {
           if (collectionProducts) setCollectionStatus('hidden');
-        }, 3000);
+        }, 5000);
         updateCollectionInfo();
       } catch (err) {
-        setCollectionStatus('error', `Failed to load collection: ${err.message}`);
+        const msg = err.name === 'AbortError'
+          ? 'Request timed out. The store may be slow or unreachable.'
+          : `Failed to load collection: ${err.message}`;
+        setCollectionStatus('error', msg);
         btn.disabled = false;
       } finally {
         collectionLoading = false;
