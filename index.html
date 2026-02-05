@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Low Inventory Checker</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='50%25' cy='50%25' r='50%25'><stop offset='0%25' stop-color='%23fff' stop-opacity='0.9'/><stop offset='30%25' stop-color='%23ff69b4'/><stop offset='70%25' stop-color='%23cc0066'/><stop offset='100%25' stop-color='%23cc0066' stop-opacity='0'/></radialGradient><radialGradient id='glow' cx='50%25' cy='50%25' r='50%25'><stop offset='60%25' stop-color='%23ff69b4' stop-opacity='0.4'/><stop offset='100%25' stop-color='%23ff69b4' stop-opacity='0'/></radialGradient></defs><circle cx='50' cy='50' r='48' fill='url(%23glow)'/><circle cx='50' cy='50' r='30' fill='url(%23g)'/></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    /* Password Gate */
+    #gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    #gate h1 { font-size: 1.4rem; margin-bottom: 8px; color: #fff; }
+    #gate p { font-size: 0.85rem; color: #888; margin-bottom: 24px; }
+    #gate .input-row { display: flex; gap: 8px; }
+
+    #gate input {
+      padding: 10px 16px; font-size: 1rem; border: 1px solid #333;
+      border-radius: 6px; background: #1a1a1a; color: #fff;
+      outline: none; width: 260px;
+    }
+    #gate input:focus { border-color: #555; }
+
+    #gate button {
+      padding: 10px 20px; font-size: 1rem; border: none; border-radius: 6px;
+      background: #fff; color: #000; cursor: pointer; font-weight: 600;
+    }
+    #gate button:hover { background: #ddd; }
+    #gate .error { color: #e54; font-size: 0.85rem; margin-top: 12px; min-height: 20px; }
+
+    /* App */
+    #app {
+      display: none;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px 100px;
+    }
+
+    #app h1 { font-size: 1.5rem; color: #fff; margin-bottom: 4px; }
+    #app .subtitle { font-size: 0.8rem; color: #666; margin-bottom: 24px; }
+
+    #url-input {
+      width: 100%; padding: 14px 18px; font-size: 1rem;
+      border: 1px solid #333; border-radius: 8px; background: #1a1a1a;
+      color: #fff; outline: none; transition: border-color 0.2s;
+    }
+    #url-input:focus { border-color: #555; }
+    #url-input::placeholder { color: #555; }
+
+    #check-btn {
+      margin-top: 12px; width: 100%; padding: 12px; font-size: 1rem;
+      font-weight: 600; border: none; border-radius: 6px; cursor: pointer;
+      background: #cc0066; color: #fff; transition: background 0.15s;
+    }
+    #check-btn:hover { background: #aa0055; }
+    #check-btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+    #status {
+      font-size: 0.8rem; color: #666; margin-top: 12px; min-height: 20px;
+    }
+
+    /* Result card */
+    #result {
+      margin-top: 20px; display: none;
+    }
+
+    .result-card {
+      padding: 20px; border-radius: 8px; border: 1px solid #333;
+      background: #1a1a1a;
+    }
+
+    .result-card.found {
+      border-color: #2a8a4a;
+      background: rgba(42, 138, 74, 0.1);
+    }
+
+    .result-card.not-found {
+      border-color: #e54;
+      background: rgba(238, 85, 68, 0.08);
+    }
+
+    .result-indicator {
+      font-size: 1.1rem; font-weight: 700; margin-bottom: 8px;
+    }
+
+    .result-indicator.found { color: #4eca7a; }
+    .result-indicator.not-found { color: #e54; }
+
+    .result-handle {
+      font-family: monospace; font-size: 0.85rem; color: #888;
+      margin-bottom: 4px; word-break: break-all;
+    }
+
+    .result-title {
+      font-size: 1rem; color: #fff; margin-bottom: 8px;
+    }
+
+    .result-link {
+      font-size: 0.85rem;
+    }
+
+    .result-link a {
+      color: #cc0066; text-decoration: none;
+    }
+    .result-link a:hover { text-decoration: underline; }
+
+    /* Collection info */
+    #collection-info {
+      margin-top: 16px; font-size: 0.75rem; color: #444;
+    }
+
+    #logout-btn {
+      position: fixed; top: 16px; right: 16px; background: none;
+      border: 1px solid #333; color: #666; padding: 6px 12px;
+      border-radius: 4px; font-size: 0.75rem; cursor: pointer;
+    }
+    #logout-btn:hover { color: #aaa; border-color: #555; }
+
+    #refresh-btn {
+      background: none; border: 1px solid #333; color: #666;
+      padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;
+      cursor: pointer; margin-left: 8px;
+    }
+    #refresh-btn:hover { color: #aaa; border-color: #555; }
+
+    .loading-spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid #333; border-top-color: #cc0066;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Password Gate -->
+  <div id="gate">
+    <h1 id="gate-title">Enter Password</h1>
+    <p id="gate-subtitle">Access is restricted.</p>
+    <div class="input-row">
+      <input type="password" id="pw-input" placeholder="Password" autocomplete="off">
+      <button id="pw-btn" onclick="handlePassword()">Go</button>
+    </div>
+    <div class="error" id="pw-error"></div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app">
+    <h1>Low Inventory Checker</h1>
+    <p class="subtitle">Paste a product URL to check if it's in the low-inventory collection.</p>
+    <input type="text" id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album" autofocus>
+    <button id="check-btn" onclick="checkProduct()">Check</button>
+    <div id="status"></div>
+    <div id="result"></div>
+    <div id="collection-info"></div>
+    <button id="logout-btn" onclick="logout()">Lock</button>
+  </div>
+
+  <script>
+    // ─── Password Protection ───────────────────────────────────────────
+    async function sha256(str) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    const STORAGE_KEY = 'tsov_pw_hash';
+    function getStoredHash() { return localStorage.getItem(STORAGE_KEY); }
+
+    async function handlePassword() {
+      const input = document.getElementById('pw-input').value;
+      if (!input) return;
+      const hash = await sha256(input);
+      const stored = getStoredHash();
+      if (!stored) {
+        localStorage.setItem(STORAGE_KEY, hash);
+        sessionStorage.setItem('tsov_auth', 'true');
+        showApp();
+      } else if (hash === stored) {
+        sessionStorage.setItem('tsov_auth', 'true');
+        showApp();
+      } else {
+        document.getElementById('pw-error').textContent = 'Incorrect password.';
+        document.getElementById('pw-input').value = '';
+        document.getElementById('pw-input').focus();
+      }
+    }
+
+    function showApp() {
+      document.getElementById('gate').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('url-input').focus();
+      loadCollection();
+    }
+
+    function showGate() {
+      document.getElementById('gate').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      const stored = getStoredHash();
+      if (!stored) {
+        document.getElementById('gate-title').textContent = 'Create a Password';
+        document.getElementById('gate-subtitle').textContent = 'Set a password for this tool. Share it with your team.';
+        document.getElementById('pw-btn').textContent = 'Set';
+      } else {
+        document.getElementById('gate-title').textContent = 'Enter Password';
+        document.getElementById('gate-subtitle').textContent = 'Access is restricted.';
+        document.getElementById('pw-btn').textContent = 'Go';
+      }
+    }
+
+    function logout() {
+      sessionStorage.removeItem('tsov_auth');
+      document.getElementById('pw-input').value = '';
+      document.getElementById('pw-error').textContent = '';
+      document.getElementById('url-input').value = '';
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('status').textContent = '';
+      document.getElementById('collection-info').textContent = '';
+      showGate();
+    }
+
+    document.getElementById('pw-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handlePassword();
+    });
+
+    if (sessionStorage.getItem('tsov_auth') === 'true' && getStoredHash()) {
+      showApp();
+    } else {
+      showGate();
+    }
+
+    // ─── Collection Loading ────────────────────────────────────────────
+    const SHOP = 'https://thesoundofvinyl.us';
+    const COLLECTION_HANDLE = 'low-inventory';
+
+    let collectionProducts = null; // Map of handle -> product
+    let collectionLoading = false;
+
+    async function loadCollection(forceRefresh = false) {
+      if (collectionProducts && !forceRefresh) {
+        updateCollectionInfo();
+        return;
+      }
+      if (collectionLoading) return;
+
+      collectionLoading = true;
+      const status = document.getElementById('status');
+      const btn = document.getElementById('check-btn');
+      btn.disabled = true;
+      status.innerHTML = '<span class="loading-spinner"></span>Loading low-inventory collection...';
+
+      try {
+        const products = new Map();
+        let page = 1;
+        const limit = 250;
+
+        while (true) {
+          const url = `${SHOP}/collections/${COLLECTION_HANDLE}/products.json?limit=${limit}&page=${page}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Failed to fetch collection (HTTP ${res.status})`);
+          const data = await res.json();
+
+          if (!data.products || data.products.length === 0) break;
+
+          for (const p of data.products) {
+            products.set(p.handle.toLowerCase(), {
+              title: p.title,
+              handle: p.handle,
+              url: `${SHOP}/products/${p.handle}`
+            });
+          }
+
+          status.innerHTML = `<span class="loading-spinner"></span>Loading... ${products.size} products so far`;
+
+          if (data.products.length < limit) break;
+          page++;
+        }
+
+        collectionProducts = products;
+        btn.disabled = false;
+        status.textContent = '';
+        updateCollectionInfo();
+      } catch (err) {
+        status.textContent = `Error loading collection: ${err.message}`;
+        btn.disabled = false;
+      } finally {
+        collectionLoading = false;
+      }
+    }
+
+    function updateCollectionInfo() {
+      const info = document.getElementById('collection-info');
+      if (collectionProducts) {
+        const refreshBtn = '<button id="refresh-btn" onclick="loadCollection(true)">Refresh</button>';
+        info.innerHTML = `${collectionProducts.size} products cached from <code>${COLLECTION_HANDLE}</code> collection. ${refreshBtn}`;
+      }
+    }
+
+    // ─── URL Normalization ─────────────────────────────────────────────
+    function extractHandle(input) {
+      let cleaned = input.trim();
+      if (!cleaned) return '';
+
+      // Remove hash fragment
+      cleaned = cleaned.split('#')[0];
+      // Remove query params
+      cleaned = cleaned.split('?')[0];
+      // Remove trailing slash
+      cleaned = cleaned.replace(/\/+$/, '');
+
+      // Try to extract from /products/{handle}
+      const match = cleaned.match(/\/products\/([^/?#]+)/);
+      if (match) {
+        return match[1].toLowerCase();
+      }
+
+      // If no /products/ path, treat as bare handle
+      // Strip any remaining URL parts (in case someone pastes a full URL without /products/)
+      const lastSegment = cleaned.split('/').pop();
+      return lastSegment.toLowerCase();
+    }
+
+    // ─── Product Check ─────────────────────────────────────────────────
+    function checkProduct() {
+      const input = document.getElementById('url-input').value.trim();
+      const resultDiv = document.getElementById('result');
+
+      if (!input) {
+        resultDiv.style.display = 'none';
+        return;
+      }
+
+      if (!collectionProducts) {
+        document.getElementById('status').textContent = 'Collection not loaded yet. Please wait...';
+        return;
+      }
+
+      const handle = extractHandle(input);
+      if (!handle) {
+        resultDiv.style.display = 'none';
+        document.getElementById('status').textContent = 'Could not extract a product handle from input.';
+        return;
+      }
+
+      document.getElementById('status').textContent = '';
+
+      const product = collectionProducts.get(handle);
+
+      if (product) {
+        resultDiv.innerHTML = `
+          <div class="result-card found">
+            <div class="result-indicator found">Yes — in low inventory</div>
+            <div class="result-handle">${escapeHtml(handle)}</div>
+            <div class="result-title">${escapeHtml(product.title)}</div>
+            <div class="result-link"><a href="${escapeHtml(product.url)}" target="_blank" rel="noopener">${escapeHtml(product.url)}</a></div>
+          </div>
+        `;
+      } else {
+        resultDiv.innerHTML = `
+          <div class="result-card not-found">
+            <div class="result-indicator not-found">No — not in low inventory</div>
+            <div class="result-handle">${escapeHtml(handle)}</div>
+          </div>
+        `;
+      }
+
+      resultDiv.style.display = 'block';
+    }
+
+    // Check on Enter key
+    document.getElementById('url-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') checkProduct();
+    });
+
+    // ─── Utility ───────────────────────────────────────────────────────
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>
