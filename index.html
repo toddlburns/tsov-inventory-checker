@@ -323,18 +323,26 @@
       }
     }
 
+    const CORS_PROXIES = [
+      url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+    ];
+
     async function fetchCollectionPage(page, limit) {
       const directUrl = `${SHOP}/collections/${COLLECTION_HANDLE}/products.json?limit=${limit}&page=${page}`;
-      // Try direct fetch first
+      // Try direct fetch first (works if same-origin or CORS enabled)
       try {
         const res = await fetchWithTimeout(directUrl);
         if (res.ok) return await res.json();
-      } catch (e) { /* fall through to proxy */ }
-      // Fallback: CORS proxy
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
-      const res = await fetchWithTimeout(proxyUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      } catch (e) { /* fall through to proxies */ }
+      // Try CORS proxies in order
+      for (const makeUrl of CORS_PROXIES) {
+        try {
+          const res = await fetchWithTimeout(makeUrl(directUrl));
+          if (res.ok) return await res.json();
+        } catch (e) { /* try next proxy */ }
+      }
+      throw new Error('All proxies failed. Try again later.');
     }
 
     async function loadCollection(forceRefresh = false) {
@@ -471,7 +479,8 @@
       }
 
       if (!collectionProducts) {
-        document.getElementById('status').textContent = 'Collection not loaded yet. Please wait...';
+        document.getElementById('status').textContent = 'Collection not loaded yet. Check status above or click Retry.';
+        loadCollection();
         return;
       }
 
