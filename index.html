@@ -128,6 +128,37 @@
     }
     .result-link a:hover { text-decoration: underline; }
 
+    /* Collection status bar */
+    #collection-status {
+      margin-bottom: 20px; padding: 14px 16px; border-radius: 8px;
+      border: 1px solid #333; background: #1a1a1a; display: none;
+    }
+    #collection-status.visible { display: block; }
+    #collection-status .cs-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    #collection-status .cs-msg {
+      display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #ccc;
+      flex: 1; min-width: 0;
+    }
+    #collection-status .cs-progress-wrap {
+      width: 100%; height: 4px; background: #333; border-radius: 2px;
+      margin-top: 10px; overflow: hidden;
+    }
+    #collection-status .cs-progress-bar {
+      height: 100%; background: #cc0066; border-radius: 2px;
+      transition: width 0.3s ease; width: 0%;
+    }
+    #collection-status.error { border-color: #663; }
+    #collection-status.error .cs-msg { color: #e54; }
+    #collection-status.success { border-color: #2a8a4a; }
+    #collection-status.success .cs-msg { color: #4eca7a; }
+    #collection-status .cs-retry {
+      background: none; border: 1px solid #555; color: #ccc; padding: 6px 14px;
+      border-radius: 5px; font-size: 0.8rem; cursor: pointer; white-space: nowrap;
+    }
+    #collection-status .cs-retry:hover { border-color: #888; color: #fff; }
+
     /* Collection info */
     #collection-info {
       margin-top: 16px; font-size: 0.75rem; color: #444;
@@ -176,6 +207,7 @@
   <div id="app">
     <h1>Low Inventory Checker</h1>
     <p class="subtitle">Paste up to 20 product URLs (one per line) to check against the low-inventory collection.</p>
+    <div id="collection-status"></div>
     <textarea id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album" rows="1" autofocus></textarea>
     <button id="check-btn" onclick="checkProducts()">Check</button>
     <div id="status"></div>
@@ -263,6 +295,21 @@
     let collectionProducts = null; // Map of handle -> product
     let collectionLoading = false;
 
+    function setCollectionStatus(state, msg, progress) {
+      const el = document.getElementById('collection-status');
+      el.className = state === 'hidden' ? '' : 'visible' + (state === 'error' ? ' error' : state === 'success' ? ' success' : '');
+      if (state === 'hidden') return;
+
+      const retryBtn = state === 'error'
+        ? '<button class="cs-retry" onclick="loadCollection(true)">Retry</button>' : '';
+      const progressBar = state === 'loading'
+        ? `<div class="cs-progress-wrap"><div class="cs-progress-bar" style="width:${progress || 5}%"></div></div>` : '';
+      const spinner = state === 'loading'
+        ? '<span class="loading-spinner"></span>' : '';
+
+      el.innerHTML = `<div class="cs-row"><div class="cs-msg">${spinner}${msg}</div>${retryBtn}</div>${progressBar}`;
+    }
+
     async function loadCollection(forceRefresh = false) {
       if (collectionProducts && !forceRefresh) {
         updateCollectionInfo();
@@ -271,10 +318,10 @@
       if (collectionLoading) return;
 
       collectionLoading = true;
-      const status = document.getElementById('status');
       const btn = document.getElementById('check-btn');
       btn.disabled = true;
-      status.innerHTML = '<span class="loading-spinner"></span>Loading low-inventory collection...';
+      document.getElementById('status').textContent = '';
+      setCollectionStatus('loading', 'Connecting to collection&hellip;', 5);
 
       try {
         const products = new Map();
@@ -282,9 +329,15 @@
         const limit = 250;
 
         while (true) {
+          setCollectionStatus('loading',
+            page === 1
+              ? 'Scanning low-inventory collection&hellip;'
+              : `Scanning page ${page}&hellip; ${products.size} products found`,
+            Math.min(90, 10 + page * 20));
+
           const url = `${SHOP}/collections/${COLLECTION_HANDLE}/products.json?limit=${limit}&page=${page}`;
           const res = await fetch(url);
-          if (!res.ok) throw new Error(`Failed to fetch collection (HTTP ${res.status})`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
 
           if (!data.products || data.products.length === 0) break;
@@ -297,7 +350,7 @@
             });
           }
 
-          status.innerHTML = `<span class="loading-spinner"></span>Loading... ${products.size} products so far`;
+          setCollectionStatus('loading', `${products.size} products loaded`, Math.min(95, 10 + page * 20));
 
           if (data.products.length < limit) break;
           page++;
@@ -305,10 +358,13 @@
 
         collectionProducts = products;
         btn.disabled = false;
-        status.textContent = '';
+        setCollectionStatus('success', `${products.size} products loaded from <code>${COLLECTION_HANDLE}</code> collection`);
+        setTimeout(() => {
+          if (collectionProducts) setCollectionStatus('hidden');
+        }, 3000);
         updateCollectionInfo();
       } catch (err) {
-        status.textContent = `Error loading collection: ${err.message}`;
+        setCollectionStatus('error', `Failed to load collection: ${err.message}`);
         btn.disabled = false;
       } finally {
         collectionLoading = false;
