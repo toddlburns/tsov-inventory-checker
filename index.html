@@ -55,12 +55,15 @@
     #app .subtitle { font-size: 0.8rem; color: #666; margin-bottom: 24px; }
 
     #url-input {
-      width: 100%; padding: 14px 18px; font-size: 1rem;
+      width: 100%; padding: 14px 18px; font-size: 0.9rem;
+      font-family: monospace;
       border: 1px solid #333; border-radius: 8px; background: #1a1a1a;
       color: #fff; outline: none; transition: border-color 0.2s;
+      resize: vertical; min-height: 44px; height: 44px;
+      line-height: 1.5;
     }
-    #url-input:focus { border-color: #555; }
-    #url-input::placeholder { color: #555; }
+    #url-input:focus { border-color: #555; height: auto; min-height: 120px; }
+    #url-input::placeholder { color: #555; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
     #check-btn {
       margin-top: 12px; width: 100%; padding: 12px; font-size: 1rem;
@@ -74,13 +77,14 @@
       font-size: 0.8rem; color: #666; margin-top: 12px; min-height: 20px;
     }
 
-    /* Result card */
-    #result {
+    /* Results */
+    #results {
       margin-top: 20px; display: none;
+      flex-direction: column; gap: 8px;
     }
 
     .result-card {
-      padding: 20px; border-radius: 8px; border: 1px solid #333;
+      padding: 16px; border-radius: 8px; border: 1px solid #333;
       background: #1a1a1a;
     }
 
@@ -171,11 +175,11 @@
   <!-- Main App -->
   <div id="app">
     <h1>Low Inventory Checker</h1>
-    <p class="subtitle">Paste a product URL to check if it's in the low-inventory collection.</p>
-    <input type="text" id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album" autofocus>
-    <button id="check-btn" onclick="checkProduct()">Check</button>
+    <p class="subtitle">Paste up to 20 product URLs (one per line) to check against the low-inventory collection.</p>
+    <textarea id="url-input" placeholder="https://thesoundofvinyl.us/products/some-album" rows="1" autofocus></textarea>
+    <button id="check-btn" onclick="checkProducts()">Check</button>
     <div id="status"></div>
-    <div id="result"></div>
+    <div id="results"></div>
     <div id="collection-info"></div>
     <button id="logout-btn" onclick="logout()">Lock</button>
   </div>
@@ -236,7 +240,7 @@
       document.getElementById('pw-input').value = '';
       document.getElementById('pw-error').textContent = '';
       document.getElementById('url-input').value = '';
-      document.getElementById('result').style.display = 'none';
+      document.getElementById('results').style.display = 'none';
       document.getElementById('status').textContent = '';
       document.getElementById('collection-info').textContent = '';
       showGate();
@@ -372,12 +376,14 @@
     }
 
     // ─── Product Check ─────────────────────────────────────────────────
-    function checkProduct() {
-      const input = document.getElementById('url-input').value.trim();
-      const resultDiv = document.getElementById('result');
+    const MAX_URLS = 20;
 
-      if (!input) {
-        resultDiv.style.display = 'none';
+    function checkProducts() {
+      const raw = document.getElementById('url-input').value.trim();
+      const resultsDiv = document.getElementById('results');
+
+      if (!raw) {
+        resultsDiv.style.display = 'none';
         return;
       }
 
@@ -386,42 +392,58 @@
         return;
       }
 
-      const handle = extractHandle(input);
-      if (!handle) {
-        resultDiv.style.display = 'none';
-        document.getElementById('status').textContent = 'Could not extract a product handle from input.';
+      // Split by newlines, filter empties
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        resultsDiv.style.display = 'none';
+        return;
+      }
+
+      if (lines.length > MAX_URLS) {
+        document.getElementById('status').textContent = `Please enter no more than ${MAX_URLS} URLs at a time.`;
         return;
       }
 
       document.getElementById('status').textContent = '';
 
-      const product = collectionProducts.get(handle);
+      let foundCount = 0;
+      const cards = lines.map(line => {
+        const handle = extractHandle(line);
+        if (!handle) {
+          return `<div class="result-card not-found">
+            <div class="result-indicator not-found">Could not parse</div>
+            <div class="result-handle">${escapeHtml(line)}</div>
+          </div>`;
+        }
 
-      if (product) {
-        resultDiv.innerHTML = `
-          <div class="result-card found">
-            <div class="result-indicator found">Yes — in low inventory</div>
+        const product = collectionProducts.get(handle);
+        if (product) {
+          foundCount++;
+          return `<div class="result-card found">
+            <div class="result-indicator found">Low inventory</div>
             <div class="result-handle">${escapeHtml(handle)}</div>
             <div class="result-title">${escapeHtml(product.title)}</div>
             <div class="result-link"><a href="${escapeHtml(product.url)}" target="_blank" rel="noopener">${escapeHtml(product.url)}</a></div>
-          </div>
-        `;
-      } else {
-        resultDiv.innerHTML = `
-          <div class="result-card not-found">
-            <div class="result-indicator not-found">Not in low inventory</div>
+          </div>`;
+        } else {
+          return `<div class="result-card not-found">
+            <div class="result-indicator not-found">Not low inventory</div>
             <div class="result-handle">${escapeHtml(handle)}</div>
             <div class="result-encouragement">${escapeHtml(getRandomEncouragement())}</div>
-          </div>
-        `;
-      }
+          </div>`;
+        }
+      });
 
-      resultDiv.style.display = 'block';
+      document.getElementById('status').textContent =
+        `${lines.length} checked — ${foundCount} in low inventory, ${lines.length - foundCount} clear`;
+
+      resultsDiv.innerHTML = cards.join('');
+      resultsDiv.style.display = 'flex';
     }
 
-    // Check on Enter key
+    // Ctrl/Cmd+Enter to check from textarea
     document.getElementById('url-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') checkProduct();
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) checkProducts();
     });
 
     // ─── Utility ───────────────────────────────────────────────────────
