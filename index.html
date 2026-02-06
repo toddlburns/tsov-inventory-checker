@@ -15,37 +15,14 @@
       min-height: 100vh;
     }
 
-    /* Password Gate */
+    /* Password Gate - REMOVED */
     #gate {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
+      display: none;
     }
-
-    #gate h1 { font-size: 1.4rem; margin-bottom: 8px; color: #fff; }
-    #gate p { font-size: 0.85rem; color: #888; margin-bottom: 24px; }
-    #gate .input-row { display: flex; gap: 8px; }
-
-    #gate input {
-      padding: 10px 16px; font-size: 1rem; border: 1px solid #333;
-      border-radius: 6px; background: #1a1a1a; color: #fff;
-      outline: none; width: 260px;
-    }
-    #gate input:focus { border-color: #555; }
-
-    #gate button {
-      padding: 10px 20px; font-size: 1rem; border: none; border-radius: 6px;
-      background: #fff; color: #000; cursor: pointer; font-weight: 600;
-    }
-    #gate button:hover { background: #ddd; }
-    #gate .error { color: #e54; font-size: 0.85rem; margin-top: 12px; min-height: 20px; }
 
     /* App */
     #app {
-      display: none;
+      display: block;
       max-width: 600px;
       margin: 0 auto;
       padding: 40px 20px 100px;
@@ -164,13 +141,6 @@
       margin-top: 16px; font-size: 0.75rem; color: #444;
     }
 
-    #logout-btn {
-      position: fixed; top: 16px; right: 16px; background: none;
-      border: 1px solid #333; color: #666; padding: 6px 12px;
-      border-radius: 4px; font-size: 0.75rem; cursor: pointer;
-    }
-    #logout-btn:hover { color: #aaa; border-color: #555; }
-
     #refresh-btn {
       background: none; border: 1px solid #333; color: #666;
       padding: 4px 10px; border-radius: 4px; font-size: 0.7rem;
@@ -213,80 +183,14 @@
     <div id="status"></div>
     <div id="results"></div>
     <div id="collection-info"></div>
-    <button id="logout-btn" onclick="logout()">Lock</button>
   </div>
 
   <script>
-    // ─── Password Protection ───────────────────────────────────────────
-    async function sha256(str) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    const STORAGE_KEY = 'tsov_pw_hash';
-    function getStoredHash() { return localStorage.getItem(STORAGE_KEY); }
-
-    async function handlePassword() {
-      const input = document.getElementById('pw-input').value;
-      if (!input) return;
-      const hash = await sha256(input);
-      const stored = getStoredHash();
-      if (!stored) {
-        localStorage.setItem(STORAGE_KEY, hash);
-        sessionStorage.setItem('tsov_auth', 'true');
-        showApp();
-      } else if (hash === stored) {
-        sessionStorage.setItem('tsov_auth', 'true');
-        showApp();
-      } else {
-        document.getElementById('pw-error').textContent = 'Incorrect password.';
-        document.getElementById('pw-input').value = '';
-        document.getElementById('pw-input').focus();
-      }
-    }
-
-    function showApp() {
-      document.getElementById('gate').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+    // ─── Initialize ────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('url-input').focus();
       loadCollection();
-    }
-
-    function showGate() {
-      document.getElementById('gate').style.display = 'flex';
-      document.getElementById('app').style.display = 'none';
-      const stored = getStoredHash();
-      if (!stored) {
-        document.getElementById('gate-title').textContent = 'Create a Password';
-        document.getElementById('gate-subtitle').textContent = 'Set a password for this tool. Share it with your team.';
-        document.getElementById('pw-btn').textContent = 'Set';
-      } else {
-        document.getElementById('gate-title').textContent = 'Enter Password';
-        document.getElementById('gate-subtitle').textContent = 'Access is restricted.';
-        document.getElementById('pw-btn').textContent = 'Go';
-      }
-    }
-
-    function logout() {
-      sessionStorage.removeItem('tsov_auth');
-      document.getElementById('pw-input').value = '';
-      document.getElementById('pw-error').textContent = '';
-      document.getElementById('url-input').value = '';
-      document.getElementById('results').style.display = 'none';
-      document.getElementById('status').textContent = '';
-      document.getElementById('collection-info').textContent = '';
-      showGate();
-    }
-
-    document.getElementById('pw-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') handlePassword();
     });
-
-    if (sessionStorage.getItem('tsov_auth') === 'true' && getStoredHash()) {
-      showApp();
-    } else {
-      showGate();
-    }
 
     // ─── Collection Loading ────────────────────────────────────────────
     const SHOP = 'https://thesoundofvinyl.us';
